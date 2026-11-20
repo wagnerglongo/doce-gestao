@@ -18,7 +18,7 @@ use Confeitaria\Service\Auth;
 require dirname(__DIR__) . '/src/bootstrap.php';
 
 $pdo = Database::connect();
-Database::migrate($pdo);
+Database::upgrade($pdo);
 
 $empty = (int) $pdo->query('SELECT COUNT(*) FROM ingredients')->fetchColumn() === 0;
 if ($empty && !in_array('--sem-exemplo', $argv, true)) {

@@ -27,6 +27,7 @@ Quem vende doce costuma precificar "de cabeça" e não sabe quanto lucra de verd
 - **Custo médio ponderado:** cada compra recalcula o custo do ingrediente considerando o que já tinha em estoque.
 - **Produção em fornadas:** mostra antes o que vai ser consumido e o que falta, e só registra se tiver tudo.
 - **Vendas guardam o custo do momento:** o lucro de cada venda continua correto mesmo que o preço dos ingredientes mude depois.
+- **Usuários:** tela para criar, editar (nome, e-mail, senha) e excluir quem pode entrar.
 - **Painel:** faturamento, lucro bruto, margem, lucro líquido, gráfico diário, mais vendidos e alerta de estoque baixo.
 - **Fluxo de caixa** por período, com saldo acumulado e **exportação em CSV** que abre certo no Excel em português.
 
@@ -59,7 +60,7 @@ php bin/setup.php --sem-exemplo    # cliente: começa vazio
 
 O `.htaccess` da raiz serve tudo de dentro de `public/`: `src/`, `templates/`, `bin/` e o `config.php` nunca ficam acessíveis pelo navegador.
 
-Rodar de novo o `setup.php` depois de uma atualização acrescenta as tabelas e colunas novas sem apagar nada.
+Depois de cada push, o próprio sistema acrescenta as tabelas e colunas novas no primeiro acesso, sem apagar nada. Não precisa rodar o setup de novo.
 
 ## Rodando no computador
 
@@ -71,7 +72,7 @@ php -S localhost:8000 -t public public/index.php                          # http
 ## Testes
 
 ```bash
-composer install && composer test    # 37 testes: custo, precificação por canal, ciclos, estoque, transações, caixa, CSV, login e CSRF
+composer install && composer test    # 38 testes: custo, precificação por canal, ciclos, estoque, transações, caixa, CSV, login e CSRF
 ```
 
 O GitHub Actions roda os testes e instala o sistema num MySQL, sem Composer, como na Hostinger, a cada push.

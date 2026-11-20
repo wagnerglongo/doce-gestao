@@ -18,7 +18,9 @@ session_start([
     'use_strict_mode' => true,
 ]);
 
-$app = new App(Database::connect(), $_SESSION, dirname(__DIR__) . '/templates');
+$pdo = Database::connect();
+Database::upgrade($pdo);
+$app = new App($pdo, $_SESSION, dirname(__DIR__) . '/templates');
 
 [$status, $headers, $body] = $app->handle(
     $_SERVER['REQUEST_METHOD'],

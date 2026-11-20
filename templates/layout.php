@@ -1,7 +1,7 @@
 <?php
 $nav = ['dashboard' => ['/', 'Painel'], 'recipes' => ['/receitas', 'Receitas'], 'pricing' => ['/precificacao', 'Precificação'], 'production' => ['/producao', 'Produção'],
         'sales' => ['/vendas', 'Vendas'], 'ingredients' => ['/ingredientes', 'Ingredientes'], 'purchases' => ['/compras', 'Compras'],
-        'expenses' => ['/despesas', 'Despesas'], 'cashflow' => ['/caixa', 'Caixa']];
+        'expenses' => ['/despesas', 'Despesas'], 'cashflow' => ['/caixa', 'Caixa'], 'users' => ['/usuarios', 'Usuários']];
 $current = $active === 'recipe-form' ? 'recipes' : $active;
 ?>
 <!DOCTYPE html>

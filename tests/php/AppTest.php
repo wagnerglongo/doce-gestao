@@ -104,6 +104,40 @@ final class AppTest extends TestCase
         $this->assertSame(0, (int) $this->value('SELECT COUNT(*) FROM settings'));
     }
 
+    public function testCriaEditaEExcluiUsuarios(): void
+    {
+        $auth = new Auth($this->pdo);
+        $me = $auth->createUser('dono@exemplo.com', 'senha-do-dono');
+        $session = ['user_id' => $me, 'csrf' => 't'];
+        $app = $this->app($session);
+
+        [$status, , $body] = $app->handle('POST', '/usuarios', [], ['_csrf' => 't', 'name' => 'Maria', 'email' => 'maria@exemplo.com', 'password' => 'curta']);
+        $this->assertSame(200, $status);
+        $this->assertStringContainsString('pelo menos 8', $body);
+
+        [$status] = $app->handle('POST', '/usuarios', [], ['_csrf' => 't', 'name' => 'Maria', 'email' => 'Maria@Exemplo.com', 'password' => 'senha-da-maria']);
+        $this->assertSame(303, $status);
+        $maria = (int) $this->value('SELECT id FROM users WHERE email = ?', ['maria@exemplo.com']);
+        $this->assertNotNull($auth->attempt('maria@exemplo.com', 'senha-da-maria', '1.1.1.1'));
+
+        [, , $body] = $app->handle('POST', '/usuarios', [], ['_csrf' => 't', 'email' => 'maria@exemplo.com', 'password' => 'outra-senha']);
+        $this->assertStringContainsString('Já existe', $body);
+
+        // Editar sem senha mantém a antiga; com senha troca
+        $app->handle('POST', '/usuarios/' . $maria, [], ['_csrf' => 't', 'name' => 'Maria Souza', 'email' => 'maria@exemplo.com', 'password' => '']);
+        $this->assertNotNull($auth->attempt('maria@exemplo.com', 'senha-da-maria', '1.1.1.2'));
+        $app->handle('POST', '/usuarios/' . $maria, [], ['_csrf' => 't', 'name' => 'Maria Souza', 'email' => 'maria@exemplo.com', 'password' => 'senha-nova-123']);
+        $this->assertNotNull($auth->attempt('maria@exemplo.com', 'senha-nova-123', '1.1.1.3'));
+        $this->assertSame('Maria Souza', $this->value('SELECT name FROM users WHERE id = ?', [$maria]));
+
+        // Não exclui a si mesmo; exclui outro
+        [, , $body] = $app->handle('POST', '/usuarios/' . $me, [], ['_csrf' => 't', 'acao' => 'excluir']);
+        $this->assertStringContainsString('próprio usuário', $body);
+        [$status] = $app->handle('POST', '/usuarios/' . $maria, [], ['_csrf' => 't', 'acao' => 'excluir']);
+        $this->assertSame(303, $status);
+        $this->assertSame(1, (int) $this->value('SELECT COUNT(*) FROM users'));
+    }
+
     public function testNumerosNoFormatoBrasileiro(): void
     {
         $this->assertSame(1500.5, App::number('1.500,5'));

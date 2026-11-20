@@ -33,3 +33,10 @@ document.querySelectorAll("[data-fill]").forEach((button) => {
     field.focus();
   });
 });
+
+// Formulários que pedem confirmação antes de enviar (ex.: excluir usuário)
+document.querySelectorAll("form[data-confirm]").forEach((form) => {
+  form.addEventListener("submit", (event) => {
+    if (!window.confirm(form.dataset.confirm)) event.preventDefault();
+  });
+});

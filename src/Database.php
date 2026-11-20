@@ -27,6 +27,28 @@ final class Database
         return $pdo;
     }
 
+    /** Suba este número sempre que migrate() ganhar tabela ou coluna nova. */
+    public const SCHEMA_VERSION = 3;
+
+    /**
+     * Atualiza a estrutura do banco sozinha depois de um deploy (push no Git da Hostinger),
+     * sem precisar rodar o setup de novo. Custa uma consulta por requisição.
+     */
+    public static function upgrade(PDO $pdo): void
+    {
+        try {
+            $current = (int) $pdo->query("SELECT value FROM settings WHERE name = 'schema_version'")->fetchColumn();
+        } catch (\PDOException) {
+            $current = 0; // banco antigo, sem a tabela settings
+        }
+        if ($current >= self::SCHEMA_VERSION) {
+            return;
+        }
+        self::migrate($pdo);
+        $pdo->prepare("DELETE FROM settings WHERE name = 'schema_version'")->execute();
+        $pdo->prepare("INSERT INTO settings (name, value) VALUES ('schema_version', ?)")->execute([(string) self::SCHEMA_VERSION]);
+    }
+
     public static function isSqlite(PDO $pdo): bool
     {
         return $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
@@ -111,6 +133,7 @@ final class Database
             "users (
                 id {$id},
                 email VARCHAR(160) NOT NULL UNIQUE,
+                name VARCHAR(100) NULL,
                 password_hash VARCHAR(255) NOT NULL
             )",
             // Configurações da precificação (valor da hora, custos fixos, taxas, lucro padrão)
@@ -129,17 +152,22 @@ final class Database
             $pdo->exec("CREATE TABLE IF NOT EXISTS {$table}{$engine}");
         }
 
-        // Bancos criados antes da precificação completa: acrescenta as colunas novas
+        // Bancos criados antes das versões novas: acrescenta as colunas que faltam
         $columns = [
-            'app_price_cents' => 'INT NOT NULL DEFAULT 0',
-            'labor_minutes' => 'DECIMAL(10,2) NOT NULL DEFAULT 0',
-            'profit_percent' => 'DECIMAL(5,2) NULL',
+            'recipes' => [
+                'app_price_cents' => 'INT NOT NULL DEFAULT 0',
+                'labor_minutes' => 'DECIMAL(10,2) NOT NULL DEFAULT 0',
+                'profit_percent' => 'DECIMAL(5,2) NULL',
+            ],
+            'users' => ['name' => 'VARCHAR(100) NULL'],
         ];
-        $existing = $sqlite
-            ? array_column($pdo->query('PRAGMA table_info(recipes)')->fetchAll(), 'name')
-            : $pdo->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'recipes'")->fetchAll(PDO::FETCH_COLUMN);
-        foreach (array_diff_key($columns, array_flip($existing)) as $name => $definition) {
-            $pdo->exec("ALTER TABLE recipes ADD COLUMN {$name} {$definition}");
+        foreach ($columns as $table => $wanted) {
+            $existing = $sqlite
+                ? array_column($pdo->query("PRAGMA table_info({$table})")->fetchAll(), 'name')
+                : $pdo->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{$table}'")->fetchAll(PDO::FETCH_COLUMN);
+            foreach (array_diff_key($wanted, array_flip($existing)) as $name => $definition) {
+                $pdo->exec("ALTER TABLE {$table} ADD COLUMN {$name} {$definition}");
+            }
         }
     }
 }

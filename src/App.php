@@ -79,6 +79,10 @@ final class App
             'POST /despesas' => $this->saveExpense($post),
             'GET /caixa' => $this->cashFlow($query),
             'GET /caixa.csv' => $this->cashFlowCsv($query),
+            'GET /usuarios' => $this->users(),
+            'POST /usuarios' => $this->saveUser(null, $post),
+            'GET /usuarios/{id}' => $this->users($id),
+            'POST /usuarios/{id}' => ($post['acao'] ?? '') === 'excluir' ? $this->deleteUser($id) : $this->saveUser($id, $post),
             'GET /precificacao' => $this->pricing(),
             'POST /precificacao' => $this->savePricing($post),
             default => [404, [], $this->page('not-found', [])[2]],
@@ -338,6 +342,78 @@ final class App
     {
         $pricing = Pricing::load($this->pdo);
         return max(array_map(fn ($c) => $pricing->feePercent($c), array_keys(Pricing::CHANNELS)));
+    }
+
+    /* --- Usuários -------------------------------------------------------- */
+
+    private function users(?int $editId = null, array $errors = [], ?array $values = null): array
+    {
+        $auth = new Auth($this->pdo);
+        $list = $auth->users();
+        $editing = null;
+        foreach ($list as $user) {
+            if ((int) $user['id'] === $editId) {
+                $editing = $user;
+            }
+        }
+        if ($editId && !$editing) {
+            return [404, [], $this->page('not-found', [])[2]];
+        }
+        return $this->page('users', [
+            'users' => $list,
+            'editing' => $editing,
+            'values' => $values ?? ($editing ?? []),
+            'errors' => $errors,
+            'me' => (int) ($this->session['user_id'] ?? 0),
+            'minPassword' => Auth::MIN_PASSWORD,
+        ]);
+    }
+
+    private function saveUser(?int $id, array $post): array
+    {
+        $auth = new Auth($this->pdo);
+        $email = mb_strtolower(trim((string) ($post['email'] ?? '')));
+        $name = trim((string) ($post['name'] ?? ''));
+        $password = (string) ($post['password'] ?? '');
+
+        $errors = [];
+        if ($name !== '' && mb_strlen($name) > 100) {
+            $errors['name'] = 'Use um nome com até 100 caracteres.';
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 160) {
+            $errors['email'] = 'Informe um e-mail válido.';
+        } elseif ($auth->emailTaken($email, $id)) {
+            $errors['email'] = 'Já existe um usuário com esse e-mail.';
+        }
+        if ((!$id || $password !== '') && mb_strlen($password) < Auth::MIN_PASSWORD) {
+            $errors['password'] = sprintf('A senha precisa ter pelo menos %d caracteres.', Auth::MIN_PASSWORD);
+        }
+        if ($errors) {
+            return $this->users($id, $errors, ['email' => $email, 'name' => $name]);
+        }
+
+        if ($id) {
+            $auth->updateUser($id, $email, $name, $password);
+            $this->flash($password !== '' ? 'Usuário atualizado, com senha nova.' : 'Usuário atualizado.');
+        } else {
+            $auth->createUser($email, $password, $name);
+            $this->flash('Usuário criado. Ele já pode entrar com esse e-mail e senha.');
+        }
+        return $this->redirect('/usuarios');
+    }
+
+    private function deleteUser(int $id): array
+    {
+        $auth = new Auth($this->pdo);
+        if ($id === (int) ($this->session['user_id'] ?? 0)) {
+            return $this->users($id, ['delete' => 'Você não pode excluir o seu próprio usuário.']);
+        }
+        if (count($auth->users()) <= 1) {
+            return $this->users($id, ['delete' => 'O sistema precisa de pelo menos um usuário.']);
+        }
+        $auth->deleteUser($id);
+        $this->flash('Usuário excluído.');
+        return $this->redirect('/usuarios');
     }
 
     /* --- Precificação ---------------------------------------------------- */

@@ -89,8 +89,11 @@ final class PricingTest extends TestCase
         $pdo->exec('CREATE TABLE recipes (id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR(100) NOT NULL, yield DECIMAL(10,3) NOT NULL,
             yield_unit VARCHAR(12) NOT NULL DEFAULT \'un\', price_cents INT NOT NULL DEFAULT 0, stock DECIMAL(14,3) NOT NULL DEFAULT 0, sellable TINYINT NOT NULL DEFAULT 1)');
         $pdo->exec("INSERT INTO recipes (name, yield) VALUES ('Brigadeiro', 50)");
-        Database::migrate($pdo);
-        Database::migrate($pdo); // rodar de novo não pode quebrar
+        $pdo->exec('CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, email VARCHAR(160) NOT NULL UNIQUE, password_hash VARCHAR(255) NOT NULL)');
+        Database::upgrade($pdo);
+        Database::upgrade($pdo); // rodar de novo não pode quebrar
+        $this->assertNull($pdo->query('SELECT name FROM users')->fetchColumn() ?: null);
+        $this->assertSame((string) Database::SCHEMA_VERSION, $pdo->query("SELECT value FROM settings WHERE name = 'schema_version'")->fetchColumn());
         $row = $pdo->query('SELECT labor_minutes, app_price_cents, profit_percent FROM recipes')->fetch();
         $this->assertEquals(0, $row['labor_minutes']);
         $this->assertEquals(0, $row['app_price_cents']);

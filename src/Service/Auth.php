@@ -26,10 +26,47 @@ final class Auth
         return password_hash($password, PASSWORD_DEFAULT);
     }
 
-    public function createUser(string $email, string $password): void
+    public const MIN_PASSWORD = 8;
+
+    public function createUser(string $email, string $password, ?string $name = null): int
     {
-        $stmt = $this->pdo->prepare('INSERT INTO users (email, password_hash) VALUES (?, ?)');
-        $stmt->execute([mb_strtolower(trim($email)), self::hash($password)]);
+        $stmt = $this->pdo->prepare('INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?)');
+        $stmt->execute([mb_strtolower(trim($email)), self::hash($password), self::cleanName($name)]);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    /** Altera nome e e-mail; a senha só muda se vier preenchida. */
+    public function updateUser(int $id, string $email, ?string $name, ?string $password = null): void
+    {
+        $this->pdo->prepare('UPDATE users SET email = ?, name = ? WHERE id = ?')
+            ->execute([mb_strtolower(trim($email)), self::cleanName($name), $id]);
+        if ($password !== null && $password !== '') {
+            $this->pdo->prepare('UPDATE users SET password_hash = ? WHERE id = ?')->execute([self::hash($password), $id]);
+        }
+    }
+
+    public function deleteUser(int $id): void
+    {
+        $this->pdo->prepare('DELETE FROM users WHERE id = ?')->execute([$id]);
+    }
+
+    /** @return list<array{id: int, email: string, name: ?string}> */
+    public function users(): array
+    {
+        return $this->pdo->query('SELECT id, email, name FROM users ORDER BY name, email')->fetchAll();
+    }
+
+    public function emailTaken(string $email, ?int $exceptId = null): bool
+    {
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM users WHERE email = ? AND id <> ?');
+        $stmt->execute([mb_strtolower(trim($email)), $exceptId ?? 0]);
+        return (int) $stmt->fetchColumn() > 0;
+    }
+
+    private static function cleanName(?string $name): ?string
+    {
+        $name = trim((string) $name);
+        return $name === '' ? null : mb_substr($name, 0, 100);
     }
 
     public function isLocked(string $ip, ?int $now = null): bool
