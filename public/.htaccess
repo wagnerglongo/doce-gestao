@@ -1,0 +1,5 @@
+Options -Indexes
+RewriteEngine On
+# Arquivos que existem (CSS, JS, fontes) saem direto; o resto vai para o index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.php [L]

@@ -1,5 +1,5 @@
 /vendor/
 /*.sqlite
-.env
+/config.php
 .phpunit.result.cache
 .DS_Store

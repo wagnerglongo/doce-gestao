@@ -41,31 +41,40 @@ Quem vende doce costuma precificar "de cabeça" e não sabe quanto lucra de verd
 | Dinheiro | Valores em **centavos inteiros**. Custos unitários (frações de centavo por grama) só são arredondados na hora de exibir ou gravar uma venda. |
 | Segurança | Login com `password_hash` e limite de tentativas, token CSRF em todo POST, consultas preparadas, escape de HTML em tudo que vem do banco e *Content-Security-Policy* sem scripts inline. |
 | Excel | CSV com `;`, vírgula decimal e BOM UTF-8. Textos que começam com `=`, `+`, `-` ou `@` são neutralizados para não virarem fórmula (*CSV injection*). |
-| Banco | Mesmo código com SQLite (desenvolvimento) e MySQL (produção, via Docker Compose). |
+| Banco | Mesmo código com SQLite (desenvolvimento) e MySQL (produção na Hostinger). |
 
-## Rodando
+## Publicando na Hostinger (Web Premium)
+
+Não precisa de Docker nem de Composer no servidor: o sistema é PHP puro e carrega as próprias classes.
+
+1. **Banco:** no hPanel, *Bancos de dados › MySQL*, crie o banco e o usuário.
+2. **Site:** crie o subdomínio e, em *Avançado › Git*, conecte este repositório (branch `main`) na pasta do subdomínio. Cada push no `main` publica sozinho.
+3. **Configuração:** no *Gerenciador de arquivos*, copie `config.example.php` para `config.php` na mesma pasta e preencha os dados do banco. O `config.php` não vai para o Git.
+4. **Instalação (uma vez):** pelo SSH (hPanel › *Avançado › Acesso SSH*), dentro da pasta do site:
 
 ```bash
-composer install
-ADMIN_PASSWORD=sua-senha php bin/setup.php   # cria tabelas, usuário e 30 dias de dados de exemplo
-composer serve                               # http://localhost:8000
+ADMIN_EMAIL=voce@exemplo.com ADMIN_PASSWORD=sua-senha php bin/setup.php                 # demonstração, com 30 dias de exemplo
+ADMIN_EMAIL=cliente@exemplo.com ADMIN_PASSWORD=senha-do-cliente php bin/setup.php --sem-exemplo   # cliente: começa vazio
 ```
 
-Com Docker e MySQL:
+O `.htaccess` da raiz serve tudo de dentro de `public/`: `src/`, `templates/`, `bin/` e o `config.php` nunca ficam acessíveis pelo navegador.
+
+Rodar de novo o `setup.php` depois de uma atualização acrescenta as tabelas e colunas novas sem apagar nada.
+
+## Rodando no computador
 
 ```bash
-cp .env.example .env
-docker compose up -d --build
-docker compose exec app php bin/setup.php    # http://localhost:8080
+ADMIN_EMAIL=voce@exemplo.com ADMIN_PASSWORD=sua-senha php bin/setup.php   # usa SQLite (database.sqlite)
+php -S localhost:8000 -t public public/index.php                          # http://localhost:8000
 ```
 
 ## Testes
 
 ```bash
-composer test    # 37 testes: custo, precificação por canal, ciclos, estoque, transações, caixa, CSV, login e CSRF
+composer install && composer test    # 37 testes: custo, precificação por canal, ciclos, estoque, transações, caixa, CSV, login e CSRF
 ```
 
-O GitHub Actions roda os testes e sobe o `docker compose` com MySQL a cada push.
+O GitHub Actions roda os testes e instala o sistema num MySQL, sem Composer, como na Hostinger, a cada push.
 
 ---
 

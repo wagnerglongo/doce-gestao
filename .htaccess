@@ -1,0 +1,6 @@
+# Hospedagem compartilhada (Hostinger Web Premium): a raiz do repositório é a
+# raiz do site. Tudo é servido de dentro de public/, então src/, templates/,
+# bin/, config.php e o banco SQLite nunca ficam acessíveis pelo navegador.
+Options -Indexes
+RewriteEngine On
+RewriteRule ^(?!public/)(.*)$ public/$1 [L]

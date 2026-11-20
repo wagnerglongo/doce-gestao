@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 /**
  * Cria as tabelas, o usuário e (opcional) 30 dias de dados de exemplo.
- *   ADMIN_PASSWORD=... php bin/setup.php
- *   php bin/setup.php --sem-exemplo
+ *   ADMIN_EMAIL=... ADMIN_PASSWORD=... php bin/setup.php                (com dados de exemplo)
+ *   ADMIN_EMAIL=... ADMIN_PASSWORD=... php bin/setup.php --sem-exemplo  (cliente: começa vazio)
+ * O banco vem do config.php (ou das variáveis DB_DSN, DB_USER e DB_PASSWORD).
  */
 
 use Confeitaria\Database;
@@ -14,7 +15,7 @@ use Confeitaria\Domain\Pricing;
 use Confeitaria\Domain\RecipeCost;
 use Confeitaria\Service\Auth;
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require dirname(__DIR__) . '/src/bootstrap.php';
 
 $pdo = Database::connect();
 Database::migrate($pdo);
