@@ -53,8 +53,8 @@ Não precisa de Docker nem de Composer no servidor: o sistema é PHP puro e carr
 4. **Instalação (uma vez):** pelo SSH (hPanel › *Avançado › Acesso SSH*), dentro da pasta do site:
 
 ```bash
-ADMIN_EMAIL=voce@exemplo.com ADMIN_PASSWORD=sua-senha php bin/setup.php                 # demonstração, com 30 dias de exemplo
-ADMIN_EMAIL=cliente@exemplo.com ADMIN_PASSWORD=senha-do-cliente php bin/setup.php --sem-exemplo   # cliente: começa vazio
+php bin/setup.php                  # demonstração, com 30 dias de exemplo (usuário e senha do config.php)
+php bin/setup.php --sem-exemplo    # cliente: começa vazio
 ```
 
 O `.htaccess` da raiz serve tudo de dentro de `public/`: `src/`, `templates/`, `bin/` e o `config.php` nunca ficam acessíveis pelo navegador.
