@@ -58,6 +58,8 @@ php bin/setup.php                  # demonstração, com 30 dias de exemplo (usu
 php bin/setup.php --sem-exemplo    # cliente: começa vazio
 ```
 
+Para entregar ao cliente sem os dados de exemplo (mantém os usuários): `php bin/limpar.php --confirmar` (acrescente `--precificacao` para zerar também a configuração de preços).
+
 O `.htaccess` da raiz serve tudo de dentro de `public/`: `src/`, `templates/`, `bin/` e o `config.php` nunca ficam acessíveis pelo navegador.
 
 Depois de cada push, o próprio sistema acrescenta as tabelas e colunas novas no primeiro acesso, sem apagar nada. Não precisa rodar o setup de novo.
