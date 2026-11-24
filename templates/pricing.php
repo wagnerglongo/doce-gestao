@@ -16,9 +16,10 @@ $numField = fn ($k) => $raw ? (string) $values[$k] : qty($values[$k]);
     <h2>Custos fixos</h2>
     <div class="row">
       <label class="field">Custos fixos do mês (R$)<input name="monthly_fixed" inputmode="decimal" placeholder="850,00" value="<?= e($moneyField('monthly_fixed_cents')) ?>"></label>
-      <label class="field">Unidades vendidas por mês<input name="monthly_units" inputmode="decimal" placeholder="600" value="<?= e($numField('monthly_units')) ?>"></label>
-    </div><?= $err('monthly_fixed') ?><?= $err('monthly_units') ?>
-    <p class="muted small">Gás, energia, água, aluguel, internet, MEI, contador. O total é dividido pelas unidades vendidas no mês, e cada produto paga a sua parte.</p>
+      <label class="field">Faturamento médio do mês (R$)<input name="monthly_revenue" inputmode="decimal" placeholder="45.000,00" value="<?= e($moneyField('monthly_revenue_cents')) ?>"></label>
+    </div><?= $err('monthly_fixed') ?><?= $err('monthly_revenue') ?>
+    <?php if ($fixedPercent > 0): ?><p class="small"><b>Seus custos fixos são <?= str_replace('.', ',', (string) round($fixedPercent, 1)) ?>% do faturamento.</b></p><?php endif ?>
+    <p class="muted small">Folha, gás, energia, água, aluguel, internet, contador. O sistema calcula quanto eles representam do faturamento e coloca esse % em cada preço, então cada produto paga custo fixo proporcional ao seu valor: a torta paga mais que o brigadeiro.</p>
 
     <h2>Taxas por canal de venda</h2>
     <div class="row">
@@ -40,12 +41,12 @@ $numField = fn ($k) => $raw ? (string) $values[$k] : qty($values[$k]);
     <h2>Seus últimos 30 dias</h2>
     <dl class="facts">
       <dt>Despesas lançadas</dt><dd><?= money($last30['expenses']) ?></dd>
-      <dt>Unidades vendidas</dt><dd><?= qty($last30['sold']) ?></dd>
+      <dt>Vendas lançadas</dt><dd><?= money($last30['revenue']) ?></dd>
     </dl>
-    <p class="muted small">Use como referência para os custos fixos e as unidades por mês.</p>
+    <p class="muted small">Use como referência para os custos fixos e o faturamento do mês.</p>
     <h2>Como o preço é calculado</h2>
-    <p class="small">Custo total = ingredientes e embalagens + mão de obra + parte dos custos fixos.</p>
-    <p class="small">Preço sugerido = custo total ÷ (1 − taxas e impostos − lucro).</p>
-    <p class="muted small">Ex.: com custo de R$ 7,00, iFood a 27% e lucro de 20%, o preço fica R$ 7,00 ÷ 0,53 = R$ 13,21. Assim, depois da comissão, ainda sobram os 20% de lucro.</p>
+    <p class="small">Custo direto = ingredientes e embalagens + mão de obra (pelos minutos de cada receita).</p>
+    <p class="small">Preço sugerido = custo direto ÷ (1 − custos fixos % − taxas % − impostos % − lucro %).</p>
+    <p class="muted small">Ex.: custo direto de R$ 7,00, custos fixos de 15%, iFood a 27%, impostos de 6% e lucro de 15%: o preço fica R$ 7,00 ÷ 0,37 = R$ 18,92. Desse preço, 15% pagam os fixos, 33% vão para o iFood e os impostos, e sobram os 15% de lucro.</p>
   </aside>
 </div>

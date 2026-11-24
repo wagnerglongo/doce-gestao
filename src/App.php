@@ -294,7 +294,7 @@ final class App
             $errors['labor_minutes'] = 'Informe os minutos de trabalho da fornada (pode ser 0).';
         }
         if ($profitText !== '' && ($profit === null || !Pricing::validPercents(0, $profit) || $profit + $this->maxFee() >= 100)) {
-            $errors['profit_percent'] = 'O lucro precisa ficar entre 0% e 99% (somado com a taxa do canal, abaixo de 100%).';
+            $errors['profit_percent'] = 'O lucro, somado aos custos fixos, taxas e impostos do canal, precisa ficar abaixo de 100%.';
         }
         if (!$items) {
             $errors['items'] = 'Adicione pelo menos um ingrediente.';
@@ -341,7 +341,7 @@ final class App
     private function maxFee(): float
     {
         $pricing = Pricing::load($this->pdo);
-        return max(array_map(fn ($c) => $pricing->feePercent($c), array_keys(Pricing::CHANNELS)));
+        return max(array_map(fn ($c) => $pricing->deductionsPercent($c), array_keys(Pricing::CHANNELS)));
     }
 
     /* --- Usuários -------------------------------------------------------- */
@@ -426,9 +426,9 @@ final class App
         $stmt = $this->pdo->prepare('SELECT COALESCE(SUM(total_cents), 0) FROM expenses WHERE spent_on BETWEEN ? AND ?');
         $stmt->execute([$from, $to]);
         $expenses = (int) $stmt->fetchColumn();
-        $stmt = $this->pdo->prepare('SELECT COALESCE(SUM(quantity), 0) FROM sales WHERE sold_on BETWEEN ? AND ?');
+        $stmt = $this->pdo->prepare('SELECT COALESCE(SUM(total_cents), 0) FROM sales WHERE sold_on BETWEEN ? AND ?');
         $stmt->execute([$from, $to]);
-        $sold = (float) $stmt->fetchColumn();
+        $sold = (int) $stmt->fetchColumn();
 
         $current = [];
         foreach (array_keys(Pricing::DEFAULTS) as $name) {
@@ -437,7 +437,8 @@ final class App
         return $this->page('pricing', [
             'values' => $values ?? $current,
             'errors' => $errors,
-            'last30' => ['expenses' => $expenses, 'sold' => $sold],
+            'last30' => ['expenses' => $expenses, 'revenue' => $sold],
+            'fixedPercent' => $pricing->fixedPercent(),
         ]);
     }
 
@@ -445,7 +446,7 @@ final class App
     {
         $hourly = Money::parse((string) ($post['hourly_rate'] ?? '0') ?: '0');
         $fixed = Money::parse((string) ($post['monthly_fixed'] ?? '0') ?: '0');
-        $units = self::number($post['monthly_units'] ?? '0') ?? -1;
+        $revenue = Money::parse((string) ($post['monthly_revenue'] ?? '0') ?: '0');
         $feeOwn = self::number($post['fee_own_percent'] ?? '0') ?? -1;
         $feeApp = self::number($post['fee_app_percent'] ?? '0') ?? -1;
         $profit = self::number($post['profit_percent'] ?? '') ?? -1;
@@ -458,15 +459,18 @@ final class App
         if ($fixed === null) {
             $errors['monthly_fixed'] = 'Informe os custos fixos do mês, por exemplo 850,00.';
         }
-        if ($units < 0) {
-            $errors['monthly_units'] = 'Informe quantas unidades você vende por mês (pode ser aproximado).';
+        if ($revenue === null) {
+            $errors['monthly_revenue'] = 'Informe o faturamento médio do mês, por exemplo 45.000,00.';
+        } elseif ($fixed && !$revenue) {
+            $errors['monthly_revenue'] = 'Informe o faturamento médio do mês para calcular o % dos custos fixos.';
         }
+        $fixedPercent = $revenue ? (int) $fixed / $revenue * 100 : 0;
         if ($tax < 0 || $tax >= 100) {
             $errors['tax_percent'] = 'Informe os impostos sobre a venda entre 0% e 99% (pode ser 0).';
         }
         foreach (['fee_own_percent' => $feeOwn, 'fee_app_percent' => $feeApp] as $key => $fee) {
-            if (!Pricing::validPercents($fee + max($tax, 0), max($profit, 0))) {
-                $errors[$key] = 'A taxa precisa ficar entre 0% e 99% e, somada ao lucro, abaixo de 100%.';
+            if (!Pricing::validPercents($fee + max($tax, 0) + $fixedPercent, max($profit, 0))) {
+                $errors[$key] = 'Custos fixos, taxa, impostos e lucro precisam somar menos de 100% do preço.';
             }
         }
         if ($profit < 0 || $profit >= 100) {
@@ -475,7 +479,7 @@ final class App
         if ($errors) {
             return $this->pricing($errors, [
                 'hourly_rate_cents' => $post['hourly_rate'] ?? '', 'monthly_fixed_cents' => $post['monthly_fixed'] ?? '',
-                'monthly_units' => $post['monthly_units'] ?? '', 'fee_own_percent' => $post['fee_own_percent'] ?? '',
+                'monthly_revenue_cents' => $post['monthly_revenue'] ?? '', 'fee_own_percent' => $post['fee_own_percent'] ?? '',
                 'fee_app_percent' => $post['fee_app_percent'] ?? '', 'profit_percent' => $post['profit_percent'] ?? '',
                 'tax_percent' => $post['tax_percent'] ?? '',
                 'raw' => true,
@@ -483,7 +487,7 @@ final class App
         }
 
         Pricing::save($this->pdo, [
-            'hourly_rate_cents' => $hourly, 'monthly_fixed_cents' => $fixed, 'monthly_units' => $units,
+            'hourly_rate_cents' => $hourly, 'monthly_fixed_cents' => $fixed, 'monthly_revenue_cents' => $revenue,
             'fee_own_percent' => $feeOwn, 'fee_app_percent' => $feeApp, 'profit_percent' => $profit, 'tax_percent' => $tax,
         ]);
         $this->flash('Precificação salva. Os preços sugeridos das receitas já foram recalculados.');

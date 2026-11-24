@@ -70,7 +70,7 @@ final class AppTest extends TestCase
         $session = ['user_id' => 1, 'csrf' => 't'];
         $app = $this->app($session);
         [$status, $headers] = $app->handle('POST', '/precificacao', [], [
-            '_csrf' => 't', 'hourly_rate' => '30,00', 'monthly_fixed' => '600,00', 'monthly_units' => '600',
+            '_csrf' => 't', 'hourly_rate' => '30,00', 'monthly_fixed' => '600,00', 'monthly_revenue' => '6.000,00',
             'fee_own_percent' => '0', 'fee_app_percent' => '30', 'profit_percent' => '20',
         ]);
         $this->assertSame(303, $status);
@@ -82,10 +82,11 @@ final class AppTest extends TestCase
         ]);
         $this->assertSame(303, $status);
 
-        // R$ 2,00 ingredientes + R$ 1,00 mão de obra + R$ 1,00 fixos = R$ 4,00
+        // R$ 2,00 ingredientes + R$ 1,00 mão de obra = R$ 3,00 direto; fixos são 10% do faturamento
         [, , $body] = $app->handle('GET', '/receitas/' . $bolo);
-        $this->assertStringContainsString('R$ 5,00', $body, 'delivery: R$ 4,00 ÷ 0,8');
-        $this->assertStringContainsString('R$ 8,00', $body, 'iFood: R$ 4,00 ÷ 0,5');
+        $this->assertStringContainsString('R$ 4,29', $body, 'delivery: R$ 3,00 ÷ (1 − 10% − 20%)');
+        $this->assertStringContainsString('R$ 7,50', $body, 'iFood: R$ 3,00 ÷ (1 − 10% − 30% − 20%)');
+        $this->assertStringContainsString('Custos fixos (10%)', $body);
         $this->assertStringContainsString('data-fill="price-app"', $body);
 
         [, , $list] = $app->handle('GET', '/receitas');
@@ -96,11 +97,11 @@ final class AppTest extends TestCase
     {
         $session = ['user_id' => 1, 'csrf' => 't'];
         [$status, , $body] = $this->app($session)->handle('POST', '/precificacao', [], [
-            '_csrf' => 't', 'hourly_rate' => '0', 'monthly_fixed' => '0', 'monthly_units' => '0',
+            '_csrf' => 't', 'hourly_rate' => '0', 'monthly_fixed' => '0', 'monthly_revenue' => '0',
             'fee_own_percent' => '0', 'fee_app_percent' => '85', 'profit_percent' => '20',
         ]);
         $this->assertSame(200, $status);
-        $this->assertStringContainsString('abaixo de 100%', $body);
+        $this->assertStringContainsString('menos de 100%', $body);
         $this->assertSame(0, (int) $this->value('SELECT COUNT(*) FROM settings'));
     }
 

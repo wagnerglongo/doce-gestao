@@ -69,7 +69,7 @@ $rows = $items ?: [['ingredient_id' => null, 'sub_recipe_id' => null, 'quantity'
             <dl class="facts">
               <dt>Ingredientes e embalagens</dt><dd><?= money($s['ingredients']) ?></dd>
               <dt>Mão de obra</dt><dd><?= money($s['labor']) ?></dd>
-              <dt>Custos fixos</dt><dd><?= money($s['fixed']) ?></dd>
+              <dt>Custos fixos (<?= $pct($s['fixed_percent']) ?>)</dt><dd><?= money($s['fixed']) ?></dd>
               <dt>Taxas e impostos (<?= $pct($s['fee_percent']) ?>)</dt><dd><?= money($s['fees']) ?></dd>
               <dt>Lucro (<?= $pct($s['profit_percent']) ?>)</dt><dd><?= money($s['profit']) ?></dd>
               <dt class="total">Preço sugerido</dt><dd class="total"><?= money($s['price']) ?></dd>

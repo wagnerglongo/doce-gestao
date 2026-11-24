@@ -82,7 +82,7 @@ if ($empty && !in_array('--sem-exemplo', $argv, true)) {
     $refriVenda = $recipe('Refrigerante lata (revenda)', 1, 'un', 600, true, [['i', $refri, 1]], 0, 800);
 
     // Precificação: hora de trabalho, custos fixos, taxas por canal, impostos e lucro padrão
-    Pricing::save($pdo, ['hourly_rate_cents' => 1600, 'monthly_fixed_cents' => 450000, 'monthly_units' => 2500,
+    Pricing::save($pdo, ['hourly_rate_cents' => 1600, 'monthly_fixed_cents' => 450000, 'monthly_revenue_cents' => 4500000,
         'fee_own_percent' => 3, 'fee_app_percent' => 27, 'tax_percent' => 6, 'profit_percent' => 15]);
 
     // 30 dias de operação: produz quando precisa, vende todo dia

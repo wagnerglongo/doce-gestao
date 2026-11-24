@@ -13,8 +13,8 @@ final class PricingTest extends TestCase
     {
         return new Pricing([
             'hourly_rate_cents' => 3000,   // R$ 30,00 a hora
-            'monthly_fixed_cents' => 60000, // R$ 600,00 por mês
-            'monthly_units' => 600,         // => R$ 1,00 de fixo por unidade
+            'monthly_fixed_cents' => 60000,    // R$ 600,00 por mês
+            'monthly_revenue_cents' => 600000, // R$ 6.000,00 de faturamento => fixos são 10% do preço
             'fee_own_percent' => 0,
             'fee_app_percent' => 30,
             'profit_percent' => 20,
@@ -26,15 +26,25 @@ final class PricingTest extends TestCase
         // Ingredientes R$ 2,00/un; 60 min de trabalho numa fornada de 30 un => R$ 1,00/un
         $own = $this->pricing()->breakdown(200, 60, 30);
         $this->assertEqualsWithDelta(100, $own['labor'], 0.001);
-        $this->assertEqualsWithDelta(100, $own['fixed'], 0.001);
-        $this->assertEqualsWithDelta(400, $own['total_cost'], 0.001);
-        $this->assertSame(500, $own['price'], 'R$ 4,00 ÷ (1 − 20%)');
-        $this->assertEqualsWithDelta(100, $own['profit'], 0.001);
+        $this->assertEqualsWithDelta(10.0, $own['fixed_percent'], 0.001);
+        $this->assertSame(429, $own['price'], 'R$ 3,00 ÷ (1 − 10% fixos − 20% lucro)');
+        $this->assertEqualsWithDelta(42.9, $own['fixed'], 0.001, '10% do preço');
+        $this->assertEqualsWithDelta(86.1, $own['profit'], 0.001, '20% do preço, com o centavo do arredondamento');
 
         $app = $this->pricing()->breakdown(200, 60, 30, null, 'app');
-        $this->assertSame(800, $app['price'], 'R$ 4,00 ÷ (1 − 30% − 20%)');
-        $this->assertEqualsWithDelta(240, $app['fees'], 0.001);
-        $this->assertEqualsWithDelta(160, $app['profit'], 0.001, 'continua sobrando 20% do preço');
+        $this->assertSame(750, $app['price'], 'R$ 3,00 ÷ (1 − 10% − 30% − 20%)');
+        $this->assertEqualsWithDelta(225, $app['fees'], 0.001);
+        $this->assertEqualsWithDelta(150, $app['profit'], 0.001, 'continua sobrando 20% do preço');
+    }
+
+    public function testCustoFixoProporcionalAoPrecoDoProduto(): void
+    {
+        // Brigadeiro (custo direto R$ 1,50) x torta (custo direto R$ 60,00), mesmos 10% de fixos
+        $brigadeiro = $this->pricing()->breakdown(150, 0, 1);
+        $torta = $this->pricing()->breakdown(6000, 0, 1);
+        $this->assertEqualsWithDelta(0.1, $brigadeiro['fixed'] / $brigadeiro['price'], 0.001);
+        $this->assertEqualsWithDelta(0.1, $torta['fixed'] / $torta['price'], 0.001);
+        $this->assertTrue($torta['fixed'] > 35 * $brigadeiro['fixed'], 'a torta absorve muito mais custo fixo');
     }
 
     public function testImpostosEntramEmTodosOsCanais(): void
@@ -47,22 +57,22 @@ final class PricingTest extends TestCase
 
     public function testLucroDaReceitaSobrepoeOPadrao(): void
     {
-        $this->assertSame(800, $this->pricing()->breakdown(200, 60, 30, 50)['price']);
+        $this->assertSame(750, $this->pricing()->breakdown(200, 60, 30, 50)['price'], 'R$ 3,00 ÷ (1 − 10% − 50%)');
     }
 
     public function testTaxaMaisLucroAcimaDe100PorCentoERecusado(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->pricing()->breakdown(200, 0, 1, 70, 'app');
+        $this->pricing()->breakdown(200, 0, 1, 60, 'app');
     }
 
     public function testLucroRealComPrecoAtual(): void
     {
         $real = $this->pricing()->realProfit(200, 60, 30, 600, 'app');
-        $this->assertEqualsWithDelta(20, $real['profit'], 0.001, 'R$ 6,00 − R$ 4,00 de custo − R$ 1,80 de comissão');
-        $this->assertEqualsWithDelta(3.3, $real['profit_percent'], 0.001);
+        $this->assertEqualsWithDelta(60, $real['profit'], 0.001, 'R$ 6,00 − R$ 3,00 direto − R$ 0,60 fixos − R$ 1,80 de comissão');
+        $this->assertEqualsWithDelta(10.0, $real['profit_percent'], 0.001);
 
-        $loss = $this->pricing()->realProfit(200, 60, 30, 450, 'app');
+        $loss = $this->pricing()->realProfit(200, 60, 30, 400, 'app');
         $this->assertTrue($loss['profit'] < 0, 'preço baixo no iFood dá prejuízo');
     }
 

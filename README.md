@@ -20,7 +20,7 @@ Quem vende doce costuma precificar "de cabeça" e não sabe quanto lucra de verd
 
 ## Funcionalidades
 
-- **Precificação completa por canal:** valor da hora de trabalho, custos fixos do mês rateados por unidade, taxa do delivery próprio, comissão do iFood e impostos sobre a venda. Cada produto mostra a composição do preço, o preço sugerido em cada canal e quanto sobra de verdade com o preço atual (e avisa quando está dando prejuízo).
+- **Precificação completa por canal:** valor da hora de trabalho, custos fixos como % do faturamento (markup: cada produto paga fixo proporcional ao preço), taxa do delivery próprio, comissão do iFood e impostos sobre a venda. Cada produto mostra a composição do preço, o preço sugerido em cada canal e quanto sobra de verdade com o preço atual (e avisa quando está dando prejuízo).
 - **Itens de revenda:** refrigerante, água e outros produtos comprados prontos entram como produto de um item só, com custo, preço e estoque.
 - **Receitas com sub-receitas:** o bolo de pote usa a *massa de bolo* e a *massa de brigadeiro*, que também são receitas. O custo é calculado em cascata.
 - **Proteção contra receita circular:** se a massa usar o bolo, que usa a massa, o sistema avisa e não salva.
@@ -37,7 +37,7 @@ Quem vende doce costuma precificar "de cabeça" e não sabe quanto lucra de verd
 
 | Tema | O que foi feito |
 |---|---|
-| Regras de negócio | `Pricing` (preço = custo total ÷ (1 − taxa − lucro), por canal), `RecipeCost` (custo recursivo com memória e detecção de ciclo), `Inventory` (compra, produção e venda) e `Reports` (caixa e indicadores) não dependem de HTML nem de requisição. São testadas direto, com banco SQLite em memória. |
+| Regras de negócio | `Pricing` (markup: preço = custo direto ÷ (1 − fixos% − taxa% − impostos% − lucro%), por canal), `RecipeCost` (custo recursivo com memória e detecção de ciclo), `Inventory` (compra, produção e venda) e `Reports` (caixa e indicadores) não dependem de HTML nem de requisição. São testadas direto, com banco SQLite em memória. |
 | Consistência | Compra, produção e venda rodam em **transação**. A produção confere o estoque de tudo antes de mexer em qualquer coisa: nunca fica pela metade. |
 | Dinheiro | Valores em **centavos inteiros**. Custos unitários (frações de centavo por grama) só são arredondados na hora de exibir ou gravar uma venda. |
 | Segurança | Login com `password_hash` e limite de tentativas, token CSRF em todo POST, consultas preparadas, escape de HTML em tudo que vem do banco e *Content-Security-Policy* sem scripts inline. |
@@ -72,7 +72,7 @@ php -S localhost:8000 -t public public/index.php                          # http
 ## Testes
 
 ```bash
-composer install && composer test    # 38 testes: custo, precificação por canal, ciclos, estoque, transações, caixa, CSV, login e CSRF
+composer install && composer test    # 39 testes: custo, precificação por canal, ciclos, estoque, transações, caixa, CSV, login e CSRF
 ```
 
 O GitHub Actions roda os testes e instala o sistema num MySQL, sem Composer, como na Hostinger, a cada push.

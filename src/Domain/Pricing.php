@@ -9,18 +9,25 @@ use PDO;
 /**
  * Precificação completa de um produto, além do custo dos ingredientes:
  *
- *   custo total/un = ingredientes e embalagens
- *                  + mão de obra (minutos da fornada × valor da hora ÷ rendimento)
- *                  + custos fixos (custos fixos do mês ÷ unidades produzidas no mês)
+ *   custo direto/un = ingredientes e embalagens
+ *                   + mão de obra (minutos da fornada × valor da hora ÷ rendimento)
  *
- *   preço sugerido = custo total ÷ (1 − taxas% − lucro%)
+ *   custos fixos %  = custos fixos do mês ÷ faturamento médio do mês
+ *
+ *   preço sugerido  = custo direto ÷ (1 − custos fixos% − taxas% − impostos% − lucro%)
+ *
+ * É o método do markup: os custos fixos entram como percentual do preço, então
+ * cada produto paga uma parte proporcional ao que vende (uma torta de R$ 150
+ * absorve muito mais custo fixo que um brigadeiro de R$ 4), em vez de um valor
+ * igual por unidade. A diferença de trabalho entre produtos fica na mão de obra,
+ * que é calculada pelos minutos de cada receita.
  *
  * Cada canal de venda tem a sua taxa (delivery próprio x iFood), então o mesmo
  * produto tem um preço sugerido por canal.
  *
- * As taxas (maquininha, app de entrega) e o lucro são percentuais sobre o preço
- * de venda, por isso entram no divisor: com taxa de 10% e lucro de 20%, o custo
- * total precisa ser 70% do preço.
+ * Custos fixos, taxas, impostos e lucro são percentuais sobre o preço de venda,
+ * por isso entram no divisor: com 15% de fixos, 10% de taxa e 20% de lucro, o
+ * custo direto precisa ser 55% do preço.
  *
  * Valores em centavos (float no meio da conta, arredondado só no preço final).
  */
@@ -29,7 +36,7 @@ final class Pricing
     public const DEFAULTS = [
         'hourly_rate_cents' => 0,     // quanto vale a hora de trabalho
         'monthly_fixed_cents' => 0,   // gás, energia, aluguel, internet, MEI...
-        'monthly_units' => 0,         // quantas unidades vende/produz por mês (para ratear os fixos)
+        'monthly_revenue_cents' => 0, // faturamento médio do mês (para achar o % dos custos fixos)
         'fee_own_percent' => 0,       // taxa no delivery próprio/balcão (maquininha, Pix com taxa)
         'fee_app_percent' => 0,       // comissão do app de entrega (iFood) + taxa de pagamento dele
         'tax_percent' => 0,           // impostos sobre a venda (Simples Nacional etc.), em todos os canais
@@ -71,10 +78,23 @@ final class Pricing
     /** Canais de venda: nome => configuração com a taxa do canal. */
     public const CHANNELS = ['own' => ['Delivery próprio', 'fee_own_percent'], 'app' => ['iFood', 'fee_app_percent']];
 
-    /** Valida taxa + lucro: precisam somar menos de 100% para existir um preço. */
+    /** Valida os percentuais: precisam somar menos de 100% para existir um preço. */
     public static function validPercents(float $feePercent, float $profitPercent): bool
     {
         return $feePercent >= 0 && $profitPercent >= 0 && $feePercent + $profitPercent < 100;
+    }
+
+    /** Quanto os custos fixos representam do faturamento, em %. */
+    public function fixedPercent(): float
+    {
+        $revenue = $this->setting('monthly_revenue_cents');
+        return $revenue > 0 ? $this->setting('monthly_fixed_cents') / $revenue * 100 : 0.0;
+    }
+
+    /** Tudo que sai do preço em % num canal, menos o lucro: custos fixos + taxa + impostos. */
+    public function deductionsPercent(string $channel): float
+    {
+        return $this->fixedPercent() + $this->feePercent($channel);
     }
 
     /**
@@ -87,17 +107,15 @@ final class Pricing
     {
         $profitPercent ??= $this->setting('profit_percent');
         $feePercent = $this->feePercent($channel);
-        if (!self::validPercents($feePercent, $profitPercent)) {
-            throw new \InvalidArgumentException('Taxas e lucro precisam somar menos de 100%.');
+        if (!self::validPercents($this->deductionsPercent($channel), $profitPercent)) {
+            throw new \InvalidArgumentException('Custos fixos, taxas, impostos e lucro precisam somar menos de 100%.');
         }
 
-        $labor = $yield > 0 ? $laborMinutesPerBatch / 60 * $this->setting('hourly_rate_cents') / $yield : 0.0;
-        $units = $this->setting('monthly_units');
-        $fixed = $units > 0 ? $this->setting('monthly_fixed_cents') / $units : 0.0;
-        $total = $ingredientsUnitCents + $labor + $fixed;
-        $price = (int) ceil(round($total / (1 - ($feePercent + $profitPercent) / 100), 6));
+        $labor = $this->labor($laborMinutesPerBatch, $yield);
+        $direct = $ingredientsUnitCents + $labor;
+        $price = (int) ceil(round($direct / (1 - ($this->deductionsPercent($channel) + $profitPercent) / 100), 6));
 
-        return $this->composition($ingredientsUnitCents, $labor, $fixed, $price, $feePercent) + ['profit_percent' => $profitPercent];
+        return $this->composition($ingredientsUnitCents, $labor, $price, $feePercent) + ['profit_percent' => $profitPercent];
     }
 
     /**
@@ -107,10 +125,7 @@ final class Pricing
      */
     public function realProfit(float $ingredientsUnitCents, float $laborMinutesPerBatch, float $yield, int $priceCents, string $channel = 'own'): array
     {
-        $labor = $yield > 0 ? $laborMinutesPerBatch / 60 * $this->setting('hourly_rate_cents') / $yield : 0.0;
-        $units = $this->setting('monthly_units');
-        $fixed = $units > 0 ? $this->setting('monthly_fixed_cents') / $units : 0.0;
-        $c = $this->composition($ingredientsUnitCents, $labor, $fixed, $priceCents, $this->feePercent($channel));
+        $c = $this->composition($ingredientsUnitCents, $this->labor($laborMinutesPerBatch, $yield), $priceCents, $this->feePercent($channel));
         return [
             'total_cost' => $c['total_cost'],
             'fees' => $c['fees'],
@@ -126,14 +141,21 @@ final class Pricing
             + $this->setting('tax_percent');
     }
 
-    private function composition(float $ingredients, float $labor, float $fixed, int $price, float $feePercent): array
+    private function labor(float $minutesPerBatch, float $yield): float
     {
+        return $yield > 0 ? $minutesPerBatch / 60 * $this->setting('hourly_rate_cents') / $yield : 0.0;
+    }
+
+    private function composition(float $ingredients, float $labor, int $price, float $feePercent): array
+    {
+        $fixed = $price * $this->fixedPercent() / 100;
         $total = $ingredients + $labor + $fixed;
         $fees = $price * $feePercent / 100;
         return [
             'ingredients' => $ingredients,
             'labor' => $labor,
             'fixed' => $fixed,
+            'fixed_percent' => $this->fixedPercent(),
             'total_cost' => $total,
             'fee_percent' => $feePercent,
             'price' => $price,
