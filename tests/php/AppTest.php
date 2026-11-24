@@ -87,6 +87,9 @@ final class AppTest extends TestCase
         $this->assertStringContainsString('R$ 4,29', $body, 'delivery: R$ 3,00 ÷ (1 − 10% − 20%)');
         $this->assertStringContainsString('R$ 7,50', $body, 'iFood: R$ 3,00 ÷ (1 − 10% − 30% − 20%)');
         $this->assertStringContainsString('Custos fixos (10%)', $body);
+        // Preço do delivery informado (R$ 6,00) fica; o do iFood em branco recebe o sugerido
+        $this->assertSame(600, (int) $this->value('SELECT price_cents FROM recipes WHERE id = ?', [$bolo]));
+        $this->assertSame(750, (int) $this->value('SELECT app_price_cents FROM recipes WHERE id = ?', [$bolo]));
         $this->assertStringContainsString('data-fill="price-app"', $body);
 
         [, , $list] = $app->handle('GET', '/receitas');
@@ -103,6 +106,18 @@ final class AppTest extends TestCase
         $this->assertSame(200, $status);
         $this->assertStringContainsString('menos de 100%', $body);
         $this->assertSame(0, (int) $this->value('SELECT COUNT(*) FROM settings'));
+    }
+
+    public function testReceitaSalvaComMinutosEPrecosEmBranco(): void
+    {
+        $leite = $this->ingredient('Leite', 'g', 0, 2);
+        $session = ['user_id' => 1, 'csrf' => 't'];
+        [$status, $headers] = $this->app($session)->handle('POST', '/receitas', [], [
+            '_csrf' => 't', 'name' => 'Massa', 'yield' => '1000', 'yield_unit' => 'g', 'labor_minutes' => '', 'profit_percent' => '',
+            'price' => '', 'app_price' => '', 'item' => ["i:{$leite}"], 'quantity' => ['500'],
+        ]);
+        $this->assertSame(303, $status, 'campo de minutos vazio conta como 0');
+        $this->assertStringStartsWith('/receitas/', $headers['Location']);
     }
 
     public function testCriaEditaEExcluiUsuarios(): void

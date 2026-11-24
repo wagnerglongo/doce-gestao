@@ -262,7 +262,8 @@ final class App
         $yieldUnit = trim((string) ($post['yield_unit'] ?? 'un')) ?: 'un';
         $price = Money::parse((string) ($post['price'] ?? '0') ?: '0') ?? -1;
         $appPrice = Money::parse((string) ($post['app_price'] ?? '0') ?: '0') ?? -1;
-        $labor = self::number($post['labor_minutes'] ?? '0') ?? -1;
+        $laborText = trim((string) ($post['labor_minutes'] ?? ''));
+        $labor = $laborText === '' ? 0.0 : (self::number($laborText) ?? -1);
         $profitText = trim((string) ($post['profit_percent'] ?? ''));
         $profit = $profitText === '' ? null : self::number($profitText);
 
@@ -323,8 +324,39 @@ final class App
         }
         $this->pdo->commit();
 
-        $this->flash('Receita salva. Veja abaixo o custo e o preço sugerido.');
+        $filled = !empty($post['sellable']) ? $this->fillSuggestedPrices($id) : [];
+        $this->flash($filled
+            ? 'Receita salva. Preço preenchido com o sugerido: ' . implode(' e ', $filled) . '.'
+            : 'Receita salva. Veja ao lado o custo e o preço sugerido.');
         return $this->redirect('/receitas/' . $id);
+    }
+
+    /**
+     * Produto vendido com preço em branco: usa o preço sugerido de cada canal.
+     *
+     * @return list<string> descrição dos preços preenchidos
+     */
+    private function fillSuggestedPrices(int $id): array
+    {
+        $recipe = $this->pdo->query('SELECT * FROM recipes WHERE id = ' . $id)->fetch();
+        try {
+            $unit = $this->costs->unitCost($id);
+        } catch (\DomainException) {
+            return [];
+        }
+        $pricing = Pricing::load($this->pdo);
+        $filled = [];
+        foreach (['own' => 'price_cents', 'app' => 'app_price_cents'] as $channel => $column) {
+            if ((int) $recipe[$column] > 0) {
+                continue;
+            }
+            $suggested = $this->breakdown($pricing, $recipe, $unit, $channel);
+            if ($suggested) {
+                $this->pdo->prepare("UPDATE recipes SET {$column} = ? WHERE id = ?")->execute([$suggested['price'], $id]);
+                $filled[] = Pricing::CHANNELS[$channel][0] . ' ' . Money::format($suggested['price']);
+            }
+        }
+        return $filled;
     }
 
     /** Preço sugerido de uma receita num canal, ou null se taxa + lucro passarem de 100%. */

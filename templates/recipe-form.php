@@ -43,9 +43,11 @@ $rows = $items ?: [['ingredient_id' => null, 'sub_recipe_id' => null, 'quantity'
       <label class="field">Lucro desejado (%)<input name="profit_percent" inputmode="decimal" placeholder="<?= e(qty($defaultProfit)) ?> (padrão)" value="<?= e($profitValue) ?>"></label>
     </div><?= $err('labor_minutes') ?><?= $err('profit_percent') ?>
     <div class="row">
-      <label class="field">Preço no delivery próprio<input id="price-own" name="price" inputmode="decimal" placeholder="4,50" value="<?= e($priceValue) ?>"></label>
-      <label class="field">Preço no iFood<input id="price-app" name="app_price" inputmode="decimal" placeholder="5,90" value="<?= e($appPriceValue) ?>"></label>
+      <label class="field">Preço no delivery próprio<input id="price-own" name="price" inputmode="decimal" placeholder="automático" value="<?= e($priceValue) ?>"></label>
+      <label class="field">Preço no iFood<input id="price-app" name="app_price" inputmode="decimal" placeholder="automático" value="<?= e($appPriceValue) ?>"></label>
     </div><?= $err('price') ?>
+    <?php $sugOwn = $prices['own']['suggested']['price'] ?? null; $sugApp = $prices['app']['suggested']['price'] ?? null; ?>
+    <p class="muted small"><?php if ($sugOwn || $sugApp): ?>Preço sugerido: <b>delivery <?= $sugOwn ? money($sugOwn) : '—' ?></b> · <b>iFood <?= $sugApp ? money($sugApp) : '—' ?></b>. <?php endif ?>Deixe o preço em branco e salve para o sistema preencher com o sugerido.</p>
     <label class="check"><input type="checkbox" name="sellable" value="1" <?= !empty($values['sellable']) ? 'checked' : '' ?>> Vendido ao cliente</label>
     <p class="muted small">Desmarque "vendido" para receitas-base, como massas e recheios usados em outros produtos. O tempo dessas bases entra na mão de obra do produto final.</p>
     <div class="actions"><button class="button" type="submit">Salvar receita</button><a href="/receitas">Voltar</a></div>
